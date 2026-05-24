@@ -1,8 +1,10 @@
 const express = require('express');
+const cors = require('cors');
 const { pool } = require('./db');
 require('dotenv').config();
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 // Health check endpoint
@@ -13,6 +15,38 @@ app.get('/api/health', async (req, res) => {
     return res.status(200).json({ status: 'OK', database: 'Connected' });
   } catch (error) {
     return res.status(500).json({ status: 'Error', database: error.message });
+  }
+});
+
+// GET /api/zones - Fetches all disaster zones
+app.get('/api/zones', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT zone_id, area_name, disaster_type, severity_level, status FROM disaster_zones');
+    return res.status(200).json(rows);
+  } catch (error) {
+    console.error('Error fetching disaster zones:', error);
+    return res.status(500).json({ error: 'Failed to fetch disaster zones.', details: error.message });
+  }
+});
+
+// GET /api/inventory - Fetches all supplies inventory joined with relief camp details
+app.get('/api/inventory', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        si.item_id, 
+        si.item_name, 
+        si.quantity, 
+        si.minimum_threshold, 
+        rc.camp_name 
+      FROM supplies_inventory si 
+      JOIN relief_camps rc ON si.camp_id = rc.camp_id
+      ORDER BY si.item_id ASC
+    `);
+    return res.status(200).json(rows);
+  } catch (error) {
+    console.error('Error fetching supplies inventory:', error);
+    return res.status(500).json({ error: 'Failed to fetch supplies inventory.', details: error.message });
   }
 });
 

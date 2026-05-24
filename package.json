@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/Mohith824/ResQ-Route#readme",
   "dependencies": {
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mysql2": "^3.22.3"
