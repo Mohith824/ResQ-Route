@@ -19,18 +19,50 @@ async function initDatabase() {
     const schemaPath = path.join(__dirname, 'schema.sql');
     const schemaSql = fs.readFileSync(schemaPath, 'utf8');
 
-    // Split SQL by semicolon followed by newline to get individual statements
-    // We filter out comments and empty statements
-    const statements = schemaSql
-      .split(/;\s*[\r\n]/)
-      .map(statement => statement.trim())
-      .filter(statement => {
-        // Exclude empty statements and comment-only lines
-        if (!statement) return false;
-        const lines = statement.split('\n').map(l => l.trim());
-        const contentLines = lines.filter(l => l && !l.startsWith('--'));
-        return contentLines.length > 0;
-      });
+    // Parse SQL file line-by-line supporting DELIMITER statement changes
+    const statements = [];
+    let currentDelimiter = ';';
+    let currentStatement = '';
+
+    const lines = schemaSql.split(/\r?\n/);
+    for (let line of lines) {
+      // Strip comments (e.g. lines starting with -- or inline comments)
+      let cleanedLine = line;
+      const commentIdx = line.indexOf('--');
+      if (commentIdx !== -1) {
+        cleanedLine = line.substring(0, commentIdx);
+      }
+      const trimmedCleaned = cleanedLine.trim();
+
+      if (!trimmedCleaned) {
+        continue;
+      }
+
+      // Check if delimiter is being changed
+      if (trimmedCleaned.toUpperCase().startsWith('DELIMITER')) {
+        const parts = trimmedCleaned.split(/\s+/);
+        if (parts.length > 1) {
+          currentDelimiter = parts[1];
+        }
+        continue;
+      }
+
+      // Append line to current statement
+      currentStatement += (currentStatement ? '\n' : '') + cleanedLine;
+
+      // Check if statement ends with the active delimiter
+      if (trimmedCleaned.endsWith(currentDelimiter)) {
+        // Strip delimiter before executing
+        let sql = currentStatement.trim();
+        if (sql.endsWith(currentDelimiter)) {
+          sql = sql.substring(0, sql.length - currentDelimiter.length).trim();
+        }
+        if (sql) {
+          statements.push(sql);
+        }
+        currentStatement = '';
+      }
+    }
 
     console.log(`Executing ${statements.length} SQL statements...`);
     for (let i = 0; i < statements.length; i++) {

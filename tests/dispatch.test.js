@@ -9,14 +9,44 @@ async function resetDatabase() {
   const connection = await pool.getConnection();
   try {
     const schemaSql = fs.readFileSync(path.join(__dirname, '../schema.sql'), 'utf8');
-    const statements = schemaSql
-      .split(/;\s*[\r\n]/)
-      .map(s => s.trim())
-      .filter(s => {
-        if (!s) return false;
-        const lines = s.split('\n').map(l => l.trim());
-        return lines.filter(l => l && !l.startsWith('--')).length > 0;
-      });
+    const statements = [];
+    let currentDelimiter = ';';
+    let currentStatement = '';
+
+    const lines = schemaSql.split(/\r?\n/);
+    for (let line of lines) {
+      let cleanedLine = line;
+      const commentIdx = line.indexOf('--');
+      if (commentIdx !== -1) {
+        cleanedLine = line.substring(0, commentIdx);
+      }
+      const trimmedCleaned = cleanedLine.trim();
+
+      if (!trimmedCleaned) {
+        continue;
+      }
+
+      if (trimmedCleaned.toUpperCase().startsWith('DELIMITER')) {
+        const parts = trimmedCleaned.split(/\s+/);
+        if (parts.length > 1) {
+          currentDelimiter = parts[1];
+        }
+        continue;
+      }
+
+      currentStatement += (currentStatement ? '\n' : '') + cleanedLine;
+
+      if (trimmedCleaned.endsWith(currentDelimiter)) {
+        let sql = currentStatement.trim();
+        if (sql.endsWith(currentDelimiter)) {
+          sql = sql.substring(0, sql.length - currentDelimiter.length).trim();
+        }
+        if (sql) {
+          statements.push(sql);
+        }
+        currentStatement = '';
+      }
+    }
 
     for (const stmt of statements) {
       if (stmt) await connection.query(stmt);
@@ -125,5 +155,27 @@ describe('POST /api/dispatch - ACID Transactions', () => {
     // Verify database final state matches the successful transaction only
     const [invRows] = await pool.query('SELECT quantity FROM supplies_inventory WHERE item_id = 1');
     expect(invRows[0].quantity).toBe(500); // 1500 - 1000 = 500
+  });
+
+  it('should automatically set zone status to CRITICAL SYSTEM ALERT when inventory falls below minimum_threshold', async () => {
+    // Before dispatch: item 5 (Heavy-Duty Diesel Generators) quantity = 20, threshold = 5
+    // Dispatch 16 units to zone 4 (Pine Forest).
+    // Remaining quantity: 4. This is less than threshold 5.
+    // The AFTER UPDATE trigger on supplies_inventory should update zone 4 status to 'CRITICAL SYSTEM ALERT'.
+
+    // Verify initial state of zone 4 is NOT 'CRITICAL SYSTEM ALERT'
+    const [zoneInitial] = await pool.query('SELECT status FROM disaster_zones WHERE zone_id = 4');
+    expect(zoneInitial[0].status).not.toBe('CRITICAL SYSTEM ALERT');
+
+    const res = await request(app)
+      .post('/api/dispatch')
+      .send({ item_id: 5, zone_id: 4, quantity: 16 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.remaining_quantity).toBe(4);
+
+    // Verify trigger automatically updated the status of disaster zone 4
+    const [zoneFinal] = await pool.query('SELECT status FROM disaster_zones WHERE zone_id = 4');
+    expect(zoneFinal[0].status).toBe('CRITICAL SYSTEM ALERT');
   });
 });

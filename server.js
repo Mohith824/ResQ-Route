@@ -78,16 +78,16 @@ app.post('/api/dispatch', async (req, res) => {
       });
     }
 
-    // 4. UPDATE supplies_inventory
-    await connection.query(
-      'UPDATE supplies_inventory SET quantity = quantity - ? WHERE item_id = ?',
-      [quantityParsed, itemIdParsed]
-    );
-
-    // 5. INSERT INTO dispatch_logs
+    // 4. INSERT INTO dispatch_logs
     const [insertResult] = await connection.query(
       'INSERT INTO dispatch_logs (item_id, zone_id, quantity_sent) VALUES (?, ?, ?)',
       [itemIdParsed, zoneIdParsed, quantityParsed]
+    );
+
+    // 5. UPDATE supplies_inventory
+    await connection.query(
+      'UPDATE supplies_inventory SET quantity = quantity - ? WHERE item_id = ?',
+      [quantityParsed, itemIdParsed]
     );
 
     // COMMIT

@@ -180,3 +180,28 @@ VALUES
     (3, 2, 50, '2026-05-24 10:00:00'),  -- Dispatched Medical Kits to Coastal Hurricane
     (4, 3, 100, '2026-05-24 11:45:00'), -- Dispatched Blankets to East Ridge Landslide
     (5, 4, 3, '2026-05-24 14:20:00');    -- Dispatched Generators to West Valley Wildfire
+
+-- ============================================================================
+-- TRIGGERS & AUTOMATION
+-- ============================================================================
+
+-- AFTER UPDATE trigger on supplies_inventory to set disaster zone status
+-- to 'CRITICAL SYSTEM ALERT' when quantity falls below minimum_threshold.
+DELIMITER //
+
+CREATE TRIGGER after_supplies_inventory_update
+AFTER UPDATE ON supplies_inventory
+FOR EACH ROW
+BEGIN
+    IF NEW.quantity < NEW.minimum_threshold THEN
+        UPDATE disaster_zones
+        SET status = 'CRITICAL SYSTEM ALERT'
+        WHERE zone_id IN (
+            SELECT DISTINCT zone_id
+            FROM dispatch_logs
+            WHERE item_id = NEW.item_id
+        );
+    END IF;
+END //
+
+DELIMITER ;
