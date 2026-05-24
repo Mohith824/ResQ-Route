@@ -231,8 +231,8 @@ function App() {
       {/* Primary Workspace Grid */}
       <div className="dashboard-grid">
         
-        {/* Disaster Zones Grid */}
-        <div className="section-card">
+        {/* Left Column: Disaster Zones Grid */}
+        <div className="section-card zones-section">
           <div className="section-header">
             <h2>
               <Activity size={20} />
@@ -248,198 +248,205 @@ function App() {
               Querying disaster zones data state...
             </div>
           ) : (
-            <div className="zones-grid">
-              {zones.map(zone => {
-                const isCritical = zone.status === 'CRITICAL SYSTEM ALERT';
-                return (
-                  <div key={zone.zone_id} className={`zone-card ${isCritical ? 'critical-alert' : ''}`}>
-                    <div className="zone-card-header">
-                      <div>
-                        <div className="zone-name">{zone.area_name}</div>
-                        <div className="zone-type">{zone.disaster_type}</div>
+            <div className="zones-scroll-container">
+              <div className="zones-grid">
+                {zones.map(zone => {
+                  const isCritical = zone.status === 'CRITICAL SYSTEM ALERT';
+                  return (
+                    <div key={zone.zone_id} className={`zone-card ${isCritical ? 'critical-alert' : ''}`}>
+                      <div className="zone-card-header">
+                        <div>
+                          <div className="zone-name">{zone.area_name}</div>
+                          <div className="zone-type">{zone.disaster_type}</div>
+                        </div>
+                        <span className={`severity-badge level-${zone.severity_level}`}>
+                          Lvl {zone.severity_level}
+                        </span>
                       </div>
-                      <span className={`severity-badge level-${zone.severity_level}`}>
-                        Lvl {zone.severity_level}
-                      </span>
-                    </div>
 
-                    <div className={`zone-status-badge ${
-                      isCritical ? 'critical' : 
-                      zone.status.toLowerCase().includes('active') ? 'active' :
-                      zone.status.toLowerCase().includes('monitored') ? 'monitored' : 'resolved'
-                    }`}>
-                      {isCritical && <ShieldAlert size={14} />}
-                      {zone.status}
+                      <div className={`zone-status-badge ${
+                        isCritical ? 'critical' : 
+                        zone.status.toLowerCase().includes('active') ? 'active' :
+                        zone.status.toLowerCase().includes('monitored') ? 'monitored' : 'resolved'
+                      }`}>
+                        {isCritical && <ShieldAlert size={14} />}
+                        {zone.status}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Secure Dispatch Action Panel */}
-        <div className="section-card">
-          <div className="section-header">
-            <h2>
-              <Send size={20} />
-              Secure Dispatch Panel
-            </h2>
+        {/* Right Column: Secure Dispatch and Inventory List Stack */}
+        <div className="right-dashboard-column">
+          
+          {/* Secure Dispatch Action Panel */}
+          <div className="section-card dispatch-section">
+            <div className="section-header">
+              <h2>
+                <Send size={20} />
+                Secure Dispatch Panel
+              </h2>
+            </div>
+
+            <form className="dispatch-form" onSubmit={handleSecureDispatch}>
+              <div className="form-group">
+                <label>Select Emergency Item</label>
+                <div className="input-wrapper">
+                  <Package size={18} className="input-icon" />
+                  <select 
+                    value={selectedItem} 
+                    onChange={e => setSelectedItem(e.target.value)}
+                    required
+                  >
+                    <option value="">-- Choose Supplying Camp Item --</option>
+                    {inventory.map(item => (
+                      <option key={item.item_id} value={item.item_id}>
+                        {item.item_name} ({item.camp_name}) - Available: {item.quantity}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group-row">
+                <div className="form-group">
+                  <label>Target Disaster Zone</label>
+                  <div className="input-wrapper">
+                    <Activity size={18} className="input-icon" />
+                    <select 
+                      value={selectedZone} 
+                      onChange={e => setSelectedZone(e.target.value)}
+                      required
+                    >
+                      <option value="">-- Choose Allocation Destination --</option>
+                      {zones.map(zone => (
+                        <option key={zone.zone_id} value={zone.zone_id}>
+                          {zone.area_name} [{zone.status}]
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Allocation Quantity</label>
+                  <div className="input-wrapper">
+                    <PlusCircle size={18} className="input-icon" />
+                    <input 
+                      type="number" 
+                      placeholder="Enter units" 
+                      value={quantity}
+                      onChange={e => setQuantity(e.target.value)}
+                      min="1"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" className="btn-dispatch" disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <RefreshCw size={18} className="animate-spin" />
+                    Processing ACID Transaction...
+                  </>
+                ) : (
+                  <>
+                    <Send size={18} />
+                    Execute Secure Dispatch
+                  </>
+                )}
+              </button>
+            </form>
           </div>
 
-          <form className="dispatch-form" onSubmit={handleSecureDispatch}>
-            <div className="form-group">
-              <label>Select Emergency Item</label>
-              <div className="input-wrapper">
-                <Package size={18} className="input-icon" />
-                <select 
-                  value={selectedItem} 
-                  onChange={e => setSelectedItem(e.target.value)}
-                  required
-                >
-                  <option value="">-- Choose Supplying Camp Item --</option>
-                  {inventory.map(item => (
-                    <option key={item.item_id} value={item.item_id}>
-                      {item.item_name} ({item.camp_name}) - Available: {item.quantity}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          {/* Inventory & Safety Threshold Trackers */}
+          <div className="section-card inventory-section">
+            <div className="section-header">
+              <h2>
+                <Package size={20} />
+                Camp Inventory & Safety Trackers
+              </h2>
             </div>
 
-            <div className="form-group">
-              <label>Target Disaster Zone</label>
-              <div className="input-wrapper">
-                <Activity size={18} className="input-icon" />
-                <select 
-                  value={selectedZone} 
-                  onChange={e => setSelectedZone(e.target.value)}
-                  required
-                >
-                  <option value="">-- Choose Allocation Destination --</option>
-                  {zones.map(zone => (
-                    <option key={zone.zone_id} value={zone.zone_id}>
-                      {zone.area_name} [{zone.status}]
-                    </option>
-                  ))}
-                </select>
+            {loading ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                Polling warehouse inventory stocks...
               </div>
-            </div>
-
-            <div className="form-group">
-              <label>Allocation Quantity</label>
-              <div className="input-wrapper">
-                <PlusCircle size={18} className="input-icon" />
-                <input 
-                  type="number" 
-                  placeholder="Enter positive integer units" 
-                  value={quantity}
-                  onChange={e => setQuantity(e.target.value)}
-                  min="1"
-                  required
-                />
+            ) : (
+              <div className="table-responsive">
+                <table className="inventory-table">
+                  <thead>
+                    <tr>
+                      <th>Supply Resource & Source camp</th>
+                      <th>Current Stock</th>
+                      <th>Threshold Gauge</th>
+                      <th>Status Flag</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inventory.map(item => {
+                      const isLow = item.quantity < item.minimum_threshold;
+                      const ratio = Math.min((item.quantity / (item.minimum_threshold * 2)) * 100, 100);
+                      return (
+                        <tr key={item.item_id}>
+                          <td>
+                            <div className="item-badge-cell">
+                              <Package size={16} className="item-type-icon" />
+                              <div>
+                                <div style={{ fontWeight: '600' }}>{item.item_name}</div>
+                                <span className="camp-tag">{item.camp_name}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: '1.05rem', fontWeight: '800', color: isLow ? 'var(--color-danger)' : '#fff' }}>
+                              {item.quantity}
+                            </span>
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}> / {item.minimum_threshold} Min</span>
+                          </td>
+                          <td style={{ width: '25%' }}>
+                            <div className="progress-bar-container">
+                              <div 
+                                className="progress-bar" 
+                                style={{ 
+                                  width: `${ratio}%`, 
+                                  backgroundColor: isLow ? 'var(--color-danger)' : 'var(--color-success)' 
+                                }}
+                              ></div>
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`stock-status ${isLow ? 'low' : 'optimal'}`}>
+                              {isLow ? (
+                                <>
+                                  <AlertTriangle size={11} />
+                                  LOW STOCK
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 size={11} />
+                                  OPTIMAL
+                                </>
+                              )}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            </div>
+            )}
+          </div>
 
-            <button type="submit" className="btn-dispatch" disabled={submitting}>
-              {submitting ? (
-                <>
-                  <RefreshCw size={18} className="animate-spin" />
-                  Processing ACID Transaction...
-                </>
-              ) : (
-                <>
-                  <Send size={18} />
-                  Execute Secure Dispatch
-                </>
-              )}
-            </button>
-          </form>
         </div>
 
       </div>
-
-      {/* Inventory & Safety Threshold Trackers */}
-      <section className="section-card inventory-container">
-        <div className="section-header">
-          <h2>
-            <Package size={20} />
-            Camp Inventory & Safety Trackers
-          </h2>
-        </div>
-
-        {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-            Polling warehouse inventory stocks...
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="inventory-table">
-              <thead>
-                <tr>
-                  <th>Item Code</th>
-                  <th>Supply Resource & Source camp</th>
-                  <th>Current Stock Status</th>
-                  <th>Threshold Gauge</th>
-                  <th>Status Flag</th>
-                </tr>
-              </thead>
-              <tbody>
-                {inventory.map(item => {
-                  const isLow = item.quantity < item.minimum_threshold;
-                  const ratio = Math.min((item.quantity / (item.minimum_threshold * 2)) * 100, 100);
-                  return (
-                    <tr key={item.item_id}>
-                      <td>#{item.item_id}</td>
-                      <td>
-                        <div className="item-badge-cell">
-                          <Package size={16} className="item-type-icon" />
-                          <div>
-                            <div>{item.item_name}</div>
-                            <span className="camp-tag">{item.camp_name}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <span style={{ fontSize: '1.1rem', fontWeight: '800', color: isLow ? 'var(--color-danger)' : '#fff' }}>
-                          {item.quantity}
-                        </span>
-                        <span style={{ color: 'var(--text-secondary)' }}> / {item.minimum_threshold} Min</span>
-                      </td>
-                      <td style={{ width: '30%' }}>
-                        <div className="progress-bar-container">
-                          <div 
-                            className="progress-bar" 
-                            style={{ 
-                              width: `${ratio}%`, 
-                              backgroundColor: isLow ? 'var(--color-danger)' : 'var(--color-success)' 
-                            }}
-                          ></div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`stock-status ${isLow ? 'low' : 'optimal'}`}>
-                          {isLow ? (
-                            <>
-                              <AlertTriangle size={12} />
-                              LOW STOCK
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle2 size={12} />
-                              OPTIMAL
-                            </>
-                          )}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
     </div>
   );
 }
